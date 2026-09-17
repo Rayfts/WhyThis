@@ -2,7 +2,10 @@ module github.com/Rayfts/WhyThis
 
 go 1.27.0
 
-require modernc.org/sqlite v1.59.0
+require (
+	github.com/hmarr/codeowners v1.2.1
+	modernc.org/sqlite v1.59.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

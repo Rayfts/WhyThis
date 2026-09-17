@@ -2,13 +2,13 @@
 
 **WhyThis reconstructs the evidence-backed history behind code.**
 
-Modern tools are good at explaining what code does. WhyThis is aimed at the harder maintenance question: **why does this code exist?** It walks Git history, blame, renames, commits, reverts, tests and—when configured—GitHub pull requests/issues, then preserves that material in a provenance-aware evidence graph. Optional coding-agent adapters can interpret the evidence, but they are never allowed to replace it.
+Modern tools are good at explaining what code does. WhyThis is aimed at the harder maintenance question: **why does this code exist?** It walks Git history, blame, renames, commits, reverts, tests and—when configured—GitHub pull requests/issues, then preserves that material in a provenance-aware evidence graph. Historical-risk reports also surface matching CODEOWNERS declarations when present. Optional coding-agent adapters can interpret the evidence, but they are never allowed to replace it.
 
 > Core rule: **never answer “why” without showing the evidence.**
 
 ## Status
 
-WhyThis is an early production-oriented implementation on the road to `v0.1.0`. The deterministic core, incremental SQLite index, local HTTP API, risk signals, GitHub PR enrichment, and ten harness capability adapters are implemented. Symbol tracking is currently text/pickaxe based rather than AST-identity based. Roo Code support is intentionally limited to legacy extension detection and evidence handoff because the upstream project states that the Roo Code extension was shut down on May 15, 2026.
+WhyThis is an early production-oriented implementation on the road to `v0.1.0`. The deterministic core, incremental SQLite index, local HTTP API, risk signals, CODEOWNERS evidence, GitHub PR enrichment, and ten harness capability adapters are implemented. Symbol tracking is currently text/pickaxe based rather than AST-identity based. Roo Code support is intentionally limited to legacy extension detection and evidence handoff because the upstream project states that the Roo Code extension was shut down on May 15, 2026.
 
 ## Install
 
@@ -65,7 +65,7 @@ The index is incremental. It records the indexed head, verifies ancestry with `g
 
 ## Historical risk
 
-`whythis risk <file>` reports deterministic signals rather than an opaque AI score. The current default indicators are repeated fix-like commits, repeated reverts, line churn and author-count/ownership churn. Thresholds and their exact meaning are documented in [`docs/evidence-model.md`](docs/evidence-model.md). A lack of triggered indicators is **not** a safety guarantee.
+`whythis risk <file>` reports deterministic signals rather than an opaque AI score. The current default indicators are repeated fix-like commits, repeated reverts, line churn and author-count/ownership churn. The report also includes the matching CODEOWNERS source, rule and configured owners when a repository declares them; this is supporting responsibility evidence, not a risk score by itself. Thresholds and their exact meaning are documented in [`docs/evidence-model.md`](docs/evidence-model.md). A lack of triggered indicators is **not** a safety guarantee.
 
 ## GitHub enrichment
 
@@ -108,8 +108,14 @@ Endpoints:
 - `GET /healthz`
 - `GET /v1/archaeology?target=src/foo.go:42-60`
 - `GET /v1/history?path=src/foo.go`
+- `GET /v1/symbol?name=SessionManager.Refresh`
+- `GET /v1/commit?sha=<sha>`
+- `GET /v1/similar?sha=<sha>&limit=10`
+- `GET /v1/ask?q=What+broke+before+this+retry+code+was+added%3F`
+- `GET /v1/pr?number=123`
 - `GET /v1/risk?path=src/foo.go`
 - `GET /v1/harnesses`
+- `GET /v1/capabilities?id=codex`
 
 The server binds to loopback by default and sets conservative HTTP timeouts. Authentication is not yet implemented; do not expose it directly to untrusted networks.
 

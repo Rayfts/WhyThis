@@ -59,3 +59,10 @@ Current thresholds:
 | ownership-churn | 10 distinct author emails | ownership context is distributed |
 
 These are triage signals, not probabilities and not proof of current defect risk.
+
+
+## Ownership evidence
+
+WhyThis distinguishes declared code ownership from historical authorship. Git commit authors are collected from repository history. Declared ownership is evaluated from GitHub-standard CODEOWNERS locations in precedence order: `.github/CODEOWNERS`, `CODEOWNERS`, then `docs/CODEOWNERS`; within a ruleset, the last matching rule wins. The matched source, rule, line and owners are recorded in the deterministic historical-risk report.
+
+A CODEOWNERS assignment does not prove why code exists and is never treated as intent. It only records the repository's declared responsibility for that path at the analyzed revision. Repositories without CODEOWNERS continue normally.
