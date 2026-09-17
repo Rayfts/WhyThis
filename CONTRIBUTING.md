@@ -18,6 +18,7 @@ Before opening a pull request, add or update tests for archaeology behavior. Pre
 
 ## Evidence integrity rules
 
+- Keep Go source files at or below 300 lines; split by responsibility when they grow beyond that boundary.
 - Do not add a FACT unless a deterministic collector can point to its provenance.
 - Do not parse an LLM response into deterministic evidence.
 - Keep Git process execution inside `internal/gitx`.

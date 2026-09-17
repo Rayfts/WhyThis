@@ -26,7 +26,7 @@ package fixture
 func ExampleRetry() { _ = Retry() }
 GO
 git add . && git commit -q -m "fix: bound retry attempts fixes #11"
-git revert -q --no-edit HEAD
+git revert --no-edit HEAD
 git mv retry.go backoff.go
 git commit -q -m "refactor: rename retry implementation"
 cat > backoff.go <<'GO'

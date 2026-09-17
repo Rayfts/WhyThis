@@ -36,28 +36,56 @@ func (s *Service) Line(ctx context.Context, target string) (evidence.Report, err
 	if err != nil {
 		return evidence.Report{}, err
 	}
-	return s.History.Line(ctx, t)
+	r, err := s.History.Line(ctx, t)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) FileHistory(ctx context.Context, path string) (evidence.Report, error) {
-	return s.History.File(ctx, path)
+	r, err := s.History.File(ctx, path)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) Similar(ctx context.Context, sha string, limit int) (evidence.Report, error) {
-	return s.History.Similar(ctx, sha, limit)
+	r, err := s.History.Similar(ctx, sha, limit)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) Symbol(ctx context.Context, symbol string) (evidence.Report, error) {
-	return s.History.Symbol(ctx, symbol)
+	r, err := s.History.Symbol(ctx, symbol)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) Commit(ctx context.Context, sha string) (evidence.Report, error) {
-	return s.History.Commit(ctx, sha)
+	r, err := s.History.Commit(ctx, sha)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) Ask(ctx context.Context, q string) (evidence.Report, error) {
-	return s.History.SearchQuestion(ctx, q)
+	r, err := s.History.SearchQuestion(ctx, q)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) PR(ctx context.Context, number int) (evidence.Report, error) {
 	if number <= 0 {
 		return evidence.Report{}, fmt.Errorf("PR number must be positive")
 	}
-	return prReportEnhanced(ctx, s.Git, s.GitHubToken, s.GitHubAPI, number, s.GitHubCache)
+	r, err := prReportEnhanced(ctx, s.Git, s.GitHubToken, s.GitHubAPI, number, s.GitHubCache)
+	if err != nil {
+		return evidence.Report{}, err
+	}
+	return s.enrichRemoteHistory(ctx, r), nil
 }
 func (s *Service) Risk(ctx context.Context, path string) (risk.Report, error) {
 	if path == "" {
@@ -67,4 +95,11 @@ func (s *Service) Risk(ctx context.Context, path string) (risk.Report, error) {
 }
 func (s *Service) Harnesses(ctx context.Context) []harness.Capabilities {
 	return s.HarnessRegistry.List(ctx)
+}
+func (s *Service) Capability(ctx context.Context, id string) (harness.Capabilities, error) {
+	h, ok := s.HarnessRegistry.Get(id)
+	if !ok {
+		return harness.Capabilities{}, fmt.Errorf("unknown harness %q", id)
+	}
+	return h.Detect(ctx)
 }

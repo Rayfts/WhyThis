@@ -1,5 +1,5 @@
-# Synthetic archaeology fixture
+# Synthetic history fixtures
 
-`build.sh` creates a disposable Git repository whose history intentionally contains a feature, regression fix, test addition, revert, rename, refactor and reimplementation. Tests create their own smaller fixture so CI does not depend on shell-specific fixture state.
+`build.sh` creates a small deterministic repository containing a bug/fix, regression-oriented test, rename, revert, and reimplementation-style history for correctness tests.
 
-The fixture exists to prove evidence collection against known history. It is not shipped as product data.
+`build-large.sh [commit-count] [output-dir]` creates a deterministic monorepo-shaped history (default 1,000 commits across 200 package paths) for manual scale testing and benchmark profiling. The generated repositories live under ignored `fixtures/tmp-*` paths and are never committed.

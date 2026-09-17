@@ -11,7 +11,11 @@ import (
 	"github.com/Rayfts/WhyThis/pkg/evidence"
 )
 
-const similarCandidateLimit = 300
+const (
+	similarCandidateLimit  = 2000
+	similarPatchShortlist  = 120
+	similarRecencyFallback = 40
+)
 
 type similarHit struct {
 	sha, patchID        string
@@ -50,10 +54,11 @@ func (a *Archaeologist) Similar(ctx context.Context, sha string, limit int) (evi
 		return evidence.Report{}, err
 	}
 	tsig := patchSig(patch)
-	shas, err := a.Git.RevListAll(ctx, similarCandidateLimit)
+	pathIndex, order, err := a.Git.RecentCommitPaths(ctx, similarCandidateLimit)
 	if err != nil {
 		return evidence.Report{}, err
 	}
+	shas := shortlistCandidates(order, pathIndex, tsig.paths, targetSHA, similarPatchShortlist, similarRecencyFallback)
 	var hits []similarHit
 	for _, candidate := range shas {
 		if candidate == targetSHA {
@@ -115,8 +120,9 @@ func (a *Archaeologist) Similar(ctx context.Context, sha string, limit int) (evi
 		}
 	}
 	unknown := []evidence.Claim{{Class: evidence.Unknown, Text: "Patch similarity does not establish shared intent or causality; matching rationale requires explicit history or discussion evidence."}}
+	unknown = append(unknown, a.historyDepthUnknown(ctx)...)
 	if len(hits) == 0 {
-		unknown = append(unknown, evidence.Claim{Class: evidence.Unknown, Text: fmt.Sprintf("No similar patch was found among the most recent %d commits traversed across refs.", similarCandidateLimit)})
+		unknown = append(unknown, evidence.Claim{Class: evidence.Unknown, Text: fmt.Sprintf("No similar patch was found after prefiltering the most recent %d commits traversed across refs.", similarCandidateLimit)})
 	}
 	return evidence.Report{Target: "similar patches to " + targetSHA, Generated: now, Repository: a.Git.Dir, Revision: head, Graph: b.Build(), Facts: dedupeClaims(facts), Unknowns: unknown, Timeline: timeline}, nil
 }
@@ -158,4 +164,49 @@ func overlap(a, b map[string]struct{}) float64 {
 		u[k] = struct{}{}
 	}
 	return float64(n) / float64(len(u))
+}
+
+func shortlistCandidates(order []string, paths map[string]map[string]struct{}, target map[string]struct{}, targetSHA string, limit, fallback int) []string {
+	type scored struct {
+		sha   string
+		score float64
+		pos   int
+	}
+	var ranked []scored
+	var recency []string
+	for i, sha := range order {
+		if sha == targetSHA {
+			continue
+		}
+		if len(recency) < fallback {
+			recency = append(recency, sha)
+		}
+		score := overlap(target, paths[sha])
+		if score > 0 {
+			ranked = append(ranked, scored{sha: sha, score: score, pos: i})
+		}
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].score != ranked[j].score {
+			return ranked[i].score > ranked[j].score
+		}
+		return ranked[i].pos < ranked[j].pos
+	})
+	seen := map[string]bool{}
+	out := make([]string, 0, limit+fallback)
+	for _, r := range ranked {
+		if len(out) >= limit {
+			break
+		}
+		seen[r.sha] = true
+		out = append(out, r.sha)
+	}
+	for _, sha := range recency {
+		if seen[sha] {
+			continue
+		}
+		seen[sha] = true
+		out = append(out, sha)
+	}
+	return out
 }

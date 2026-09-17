@@ -25,6 +25,7 @@ type Service interface {
 	PR(context.Context, int) (evidence.Report, error)
 	Risk(context.Context, string) (risk.Report, error)
 	Harnesses(context.Context) []harness.Capabilities
+	Capability(context.Context, string) (harness.Capabilities, error)
 }
 
 type Server struct {
@@ -47,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/harnesses", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.Service.Harnesses(r.Context()))
 	})
+	mux.HandleFunc("GET /v1/capabilities", s.capabilities)
 	return limitBody(mux)
 }
 
@@ -147,6 +149,15 @@ func (s *Server) pr(w http.ResponseWriter, r *http.Request) {
 	}
 	rep, err := s.Service.PR(r.Context(), n)
 	writeResult(w, rep, err)
+}
+
+func (s *Server) capabilities(w http.ResponseWriter, r *http.Request) {
+	id, ok := requiredQuery(w, r, "id")
+	if !ok {
+		return
+	}
+	cap, err := s.Service.Capability(r.Context(), id)
+	writeResult(w, cap, err)
 }
 
 func (s *Server) risk(w http.ResponseWriter, r *http.Request) {
