@@ -2,46 +2,22 @@ package harness
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
+
+	public "github.com/Rayfts/WhyThis/pkg/harness"
 )
 
-var ErrInteractiveOnly = errors.New("harness has no verified headless integration")
+var ErrInteractiveOnly = public.ErrInteractiveOnly
 
-type Capabilities struct {
-	ID               string   `json:"id"`
-	Available        bool     `json:"available"`
-	Executable       string   `json:"executable,omitempty"`
-	Integration      string   `json:"integration"`
-	StructuredOutput bool     `json:"structured_output"`
-	SessionProtocol  bool     `json:"session_protocol"`
-	EvidenceSources  []string `json:"evidence_sources"`
-	Notes            []string `json:"notes,omitempty"`
-}
-
-type AnalysisRequest struct {
-	Prompt  string
-	Timeout time.Duration
-}
-
-type AnalysisResult struct {
-	Harness string `json:"harness"`
-	Text    string `json:"text"`
-	Raw     string `json:"raw,omitempty"`
-	Format  string `json:"format"`
-}
-
-type Harness interface {
-	ID() string
-	Detect(context.Context) (Capabilities, error)
-	Analyze(context.Context, AnalysisRequest) (AnalysisResult, error)
-}
+type Capabilities = public.Capabilities
+type AnalysisRequest = public.AnalysisRequest
+type AnalysisResult = public.AnalysisResult
+type Harness = public.Adapter
 
 type Registry struct{ items map[string]Harness }
 
@@ -53,6 +29,16 @@ func NewRegistry() *Registry {
 	return r
 }
 func (r *Registry) Get(id string) (Harness, bool) { h, ok := r.items[id]; return h, ok }
+func (r *Registry) Register(h Harness) error {
+	if h == nil || strings.TrimSpace(h.ID()) == "" {
+		return fmt.Errorf("harness adapter requires a non-empty id")
+	}
+	if _, exists := r.items[h.ID()]; exists {
+		return fmt.Errorf("harness %q is already registered", h.ID())
+	}
+	r.items[h.ID()] = h
+	return nil
+}
 func (r *Registry) List(ctx context.Context) []Capabilities {
 	out := make([]Capabilities, 0, len(r.items))
 	for _, h := range r.items {

@@ -53,6 +53,9 @@ func (f *fakeService) Risk(_ context.Context, v string) (risk.Report, error) {
 	return risk.Report{Path: v}, nil
 }
 func (f *fakeService) Harnesses(context.Context) []harness.Capabilities { return nil }
+func (f *fakeService) Capability(_ context.Context, id string) (harness.Capabilities, error) {
+	return harness.Capabilities{ID: id, Available: true}, nil
+}
 
 func TestAPIRoutes(t *testing.T) {
 	tests := []struct {
