@@ -12,7 +12,7 @@ func TestSQLiteRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 	if err := s.SetMeta(ctx, "index.head", "abc"); err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func BenchmarkSQLiteMetaRead(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	ctx := context.Background()
 	_ = s.SetMeta(ctx, "index.head", "abc")
 	b.ResetTimer()

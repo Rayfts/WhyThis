@@ -76,7 +76,6 @@ type commandHarness struct {
 	sources     []string
 	args        func(promptFile, prompt string) []string
 	stdin       bool
-	workInTemp  bool
 }
 
 func (h commandHarness) ID() string { return h.id }
@@ -97,7 +96,7 @@ func (h commandHarness) Analyze(ctx context.Context, req AnalysisRequest) (Analy
 	if err != nil {
 		return AnalysisResult{}, err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	promptFile := filepath.Join(dir, "prompt.md")
 	if err := os.WriteFile(promptFile, []byte(req.Prompt), 0o600); err != nil {
 		return AnalysisResult{}, err

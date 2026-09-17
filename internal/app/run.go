@@ -37,7 +37,7 @@ type commonFlags struct {
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	cf, rest, err := parseCommon(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "whythis:", err)
+		_, _ = fmt.Fprintln(stderr, "whythis:", err)
 		return 2
 	}
 	if len(rest) == 0 {
@@ -45,7 +45,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if rest[0] == "version" || rest[0] == "--version" {
-		fmt.Fprintln(stdout, version)
+		_, _ = fmt.Fprintln(stdout, version)
 		return 0
 	}
 	cfg := config.Load(cf.repo)
@@ -61,14 +61,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	if rest[0] == "capabilities" {
 		if len(rest) < 2 {
-			fmt.Fprintln(stderr, "capabilities requires a harness id")
+			_, _ = fmt.Fprintln(stderr, "capabilities requires a harness id")
 			return 2
 		}
 		return cmdCapabilities(ctx, harness.NewRegistry(), rest[1], stdout, stderr)
 	}
 	g, err := gitx.New(cfg.RepoPath)
 	if err != nil {
-		fmt.Fprintln(stderr, "whythis:", err)
+		_, _ = fmt.Fprintln(stderr, "whythis:", err)
 		return 1
 	}
 	svc := NewService(g)
@@ -194,7 +194,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if err != nil {
-		fmt.Fprintln(stderr, "whythis:", err)
+		_, _ = fmt.Fprintln(stderr, "whythis:", err)
 		return 1
 	}
 	if s, e := openStore(); e == nil {
@@ -203,7 +203,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !cf.noAI && cfg.Harness != "" {
 		report, err = (&analysis.Orchestrator{Registry: svc.HarnessRegistry}).Synthesize(ctx, cfg.Harness, report)
 		if err != nil {
-			fmt.Fprintf(stderr, "whythis: harness synthesis skipped: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "whythis: harness synthesis skipped: %v\n", err)
 		}
 	}
 	return writeReport(report, cf.json, stdout)
@@ -246,7 +246,7 @@ func parseCommon(args []string) (commonFlags, []string, error) {
 	}
 	return c, rest, nil
 }
-func argErr(w io.Writer, msg string) int { fmt.Fprintln(w, "whythis:", msg); return 2 }
+func argErr(w io.Writer, msg string) int { _, _ = fmt.Fprintln(w, "whythis:", msg); return 2 }
 func writeAny(v any, asJSON bool, w io.Writer) int {
 	if asJSON {
 		enc := json.NewEncoder(w)
@@ -255,45 +255,45 @@ func writeAny(v any, asJSON bool, w io.Writer) int {
 		return 0
 	}
 	b, _ := json.MarshalIndent(v, "", "  ")
-	fmt.Fprintln(w, string(b))
+	_, _ = fmt.Fprintln(w, string(b))
 	return 0
 }
 func writeReport(r evidence.Report, asJSON bool, w io.Writer) int {
 	if asJSON {
 		return writeAny(r, true, w)
 	}
-	fmt.Fprintf(w, "WhyThis — %s\nrevision: %s\n\n", r.Target, short(r.Revision))
+	_, _ = fmt.Fprintf(w, "WhyThis — %s\nrevision: %s\n\n", r.Target, short(r.Revision))
 	printClaims(w, "FACTS", r.Facts)
 	printClaims(w, "INFERENCES", r.Inferences)
 	printClaims(w, "UNKNOWN", r.Unknowns)
 	if len(r.Timeline) > 0 {
-		fmt.Fprintln(w, "TIMELINE")
+		_, _ = fmt.Fprintln(w, "TIMELINE")
 		for _, n := range r.Timeline {
 			date := ""
 			if n.Attributes != nil {
 				date = fmt.Sprint(n.Attributes["date"])
 			}
-			fmt.Fprintf(w, "  %s  %-12s  %s\n", prefixDate(date), strings.TrimPrefix(n.ID, "commit:")[:min(12, len(strings.TrimPrefix(n.ID, "commit:")))], n.Label)
+			_, _ = fmt.Fprintf(w, "  %s  %-12s  %s\n", prefixDate(date), strings.TrimPrefix(n.ID, "commit:")[:min(12, len(strings.TrimPrefix(n.ID, "commit:")))], n.Label)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
-	fmt.Fprintf(w, "evidence: %d nodes, %d edges\n", len(r.Graph.Nodes), len(r.Graph.Edges))
+	_, _ = fmt.Fprintf(w, "evidence: %d nodes, %d edges\n", len(r.Graph.Nodes), len(r.Graph.Edges))
 	return 0
 }
 func printClaims(w io.Writer, title string, claims []evidence.Claim) {
-	fmt.Fprintln(w, title)
+	_, _ = fmt.Fprintln(w, title)
 	if len(claims) == 0 {
-		fmt.Fprintln(w, "  (none)")
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w, "  (none)")
+		_, _ = fmt.Fprintln(w)
 		return
 	}
 	for _, c := range claims {
-		fmt.Fprintln(w, " -", c.Text)
+		_, _ = fmt.Fprintln(w, " -", c.Text)
 		if len(c.EvidenceID) > 0 {
-			fmt.Fprintln(w, "   evidence:", strings.Join(c.EvidenceID, ", "))
+			_, _ = fmt.Fprintln(w, "   evidence:", strings.Join(c.EvidenceID, ", "))
 		}
 	}
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 }
 func prefixDate(s string) string {
 	if len(s) >= 10 {
@@ -321,7 +321,7 @@ func cmdBlame(ctx context.Context, g *gitx.Runner, target string, asJSON bool, s
 	}
 	raw, err := g.Blame(ctx, t.Path, t.Start, t.End)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	segments := gitx.ParseBlamePorcelain(raw)
@@ -337,7 +337,7 @@ func cmdHarnesses(ctx context.Context, r *harness.Registry, asJSON bool, stdout,
 		if c.Available {
 			state = "available"
 		}
-		fmt.Fprintf(stdout, "%-13s %-10s %s\n", c.ID, state, c.Integration)
+		_, _ = fmt.Fprintf(stdout, "%-13s %-10s %s\n", c.ID, state, c.Integration)
 	}
 	return 0
 }
@@ -348,7 +348,7 @@ func cmdCapabilities(ctx context.Context, r *harness.Registry, id string, stdout
 	}
 	c, err := h.Detect(ctx)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	return writeAny(c, true, stdout)
@@ -415,7 +415,7 @@ func prReport(ctx context.Context, g *gitx.Runner, cfg config.Config, n int, cac
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `WhyThis reconstructs why code exists from deterministic Git/GitHub evidence.
+	_, _ = fmt.Fprint(w, `WhyThis reconstructs why code exists from deterministic Git/GitHub evidence.
 
 Usage:
   whythis [global flags] path/to/file.go:100-140

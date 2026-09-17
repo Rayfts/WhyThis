@@ -33,7 +33,7 @@ func New(dir string) (*Runner, error) {
 	r := &Runner{Dir: abs}
 	root, err := r.Output(context.Background(), "rev-parse", "--show-toplevel")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrNotRepository, err)
+		return nil, fmt.Errorf("%w: %w", ErrNotRepository, err)
 	}
 	r.Dir = strings.TrimSpace(root)
 	return r, nil
@@ -67,7 +67,7 @@ func (r *Runner) Output(ctx context.Context, args ...string) (string, error) {
 }
 
 func (r *Runner) Head(ctx context.Context) (string, error) {
-	out, err := r.Output(ctx, "rev-parse", "HEAD")
+	out, err := r.Output(context.Background(), "rev-parse", "HEAD")
 	return strings.TrimSpace(out), err
 }
 
@@ -185,7 +185,7 @@ func (r *Runner) CommitsSince(ctx context.Context, since string) ([]string, erro
 		return nil, err
 	}
 	var commits []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+	for _, line := rane strings.Split(strings.TrimSpace(out), "\n") {
 		if s := strings.TrimSpace(line); s != "" {
 			commits = append(commits, s)
 		}

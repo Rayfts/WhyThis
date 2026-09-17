@@ -48,7 +48,7 @@ func Open(path string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db}
 	if err := s.migrate(context.Background()); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
@@ -133,7 +133,7 @@ func (s *Store) UpsertCommit(ctx context.Context, c CommitRow, changes []FileCha
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = tx.ExecContext(ctx, `INSERT INTO commits(sha,parents,author,email,authored_at,subject,body) VALUES(?,?,?,?,?,?,?) ON CONFLICT(sha) DO UPDATE SET parents=excluded.parents,author=excluded.author,email=excluded.email,authored_at=excluded.authored_at,subject=excluded.subject,body=excluded.body`, c.SHA, c.Parents, c.Author, c.Email, c.Date.UTC().Format(time.RFC3339Nano), c.Subject, c.Body)
 	if err != nil {
 		return err
@@ -154,7 +154,7 @@ func (s *Store) PutGraph(ctx context.Context, g evidence.Graph) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, n := range g.Nodes {
 		b, _ := json.Marshal(n)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO evidence_nodes(id,kind,label,json) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,label=excluded.label,json=excluded.json`, n.ID, n.Kind, n.Label, string(b)); err != nil {

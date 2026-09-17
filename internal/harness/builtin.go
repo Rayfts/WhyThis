@@ -45,7 +45,7 @@ func (piHarness) Analyze(ctx context.Context, req AnalysisRequest) (AnalysisResu
 	if err != nil {
 		return AnalysisResult{}, err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	cmd := exec.CommandContext(ctx, p, "--mode", "rpc", "--no-session")
 	cmd.Dir = dir
 	stdin, err := cmd.StdinPipe()
