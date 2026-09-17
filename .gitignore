@@ -1,11 +1,23 @@
-node_modules/
+# WhyThis runtime state
+.whyth/
+
+# Go build/test output
+bin/
 dist/
-coverage/
-*.log
+coverage.out
+*.test
+*.prof
+
+# Editors / OS
 .DS_Store
+.idea/
+.vscode/
+
+# Local environment
 .env
 .env.*
 !.env.example
-.whyth/whythis.db
-.whyth/cache/
-apps/desktop/src-tauri/target/
+*.log
+
+# Synthetic fixture output
+fixtures/tmp-history/
