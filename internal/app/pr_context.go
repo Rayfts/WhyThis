@@ -75,7 +75,8 @@ func prReportEnhanced(ctx context.Context, g *gitx.Runner, token, api string, nu
 	var timeline []evidence.Node
 	for _, f := range selected {
 		fileID := "file:" + filepath.ToSlash(f.Filename)
-		builder.AddNode(evidence.Node{ID: fileID, Kind: evidence.KindFile, Label: f.Filename, Attributes: map[string]any{"status": f.Status, "additions": f.Additions, "deletions": f.Deletions, "changes": f.Changes, "previous_filename": f.PreviousFilename}, Provenance: githubProvenance(repo, f.BlobURL, head, now)})
+		fileNode := evidence.Node{ID: fileID, Kind: evidence.KindFile, Label: f.Filename, Attributes: map[string]any{"status": f.Status, "additions": f.Additions, "deletions": f.Deletions, "changes": f.Changes, "previous_filename": f.PreviousFilename}, Provenance: githubProvenance(repo, f.BlobURL, head, now)}
+		builder.AddNode(fileNode)
 		builder.AddEdge(evidence.Edge{From: prID, To: fileID, Kind: evidence.EdgeAssociatedWith, Attributes: map[string]any{"reason": "changed by pull request", "status": f.Status}, Provenance: githubProvenance(repo, pr.PullRequest.HTMLURL, head, now)})
 		if f.PreviousFilename != "" {
 			previousID := "file:" + filepath.ToSlash(f.PreviousFilename)
@@ -93,6 +94,10 @@ func prReportEnhanced(ctx context.Context, g *gitx.Runner, token, api string, nu
 			continue
 		}
 		mergeHistoricalReport(builder, &facts, &timeline, rep, prCommits)
+		// Historical reports may contain a less-specific node for this same path.
+		// Re-apply the GitHub PR node so its changed-file metadata wins while all
+		// other historical/supporting file nodes remain materialized.
+		builder.AddNode(fileNode)
 	}
 
 	sort.Slice(timeline, func(i, j int) bool {
@@ -164,11 +169,7 @@ func mergeHistoricalReport(builder *graph.Builder, facts *[]evidence.Claim, time
 			}
 		}
 		allowed[n.ID] = struct{}{}
-		// Keep the PR-file node collected from GitHub instead of replacing it
-		// with the less specific local history file node.
-		if n.Kind != evidence.KindFile {
-			builder.AddNode(n)
-		}
+		builder.AddNode(n)
 		if n.Kind == evidence.KindCommit {
 			*timeline = append(*timeline, n)
 		}
