@@ -1,5 +1,5 @@
 module github.com/Rayfts/WhyThis
 
-go 1.26.0
+go 1.27.0
 
 require modernc.org/sqlite v1.59.0
