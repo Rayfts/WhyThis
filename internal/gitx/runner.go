@@ -185,7 +185,7 @@ func (r *Runner) CommitsSince(ctx context.Context, since string) ([]string, erro
 		return nil, err
 	}
 	var commits []string
-	for _, line := rane strings.Split(strings.TrimSpace(out), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		if s := strings.TrimSpace(line); s != "" {
 			commits = append(commits, s)
 		}
