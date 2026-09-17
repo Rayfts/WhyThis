@@ -171,7 +171,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return argErr(stderr, "invalid PR number")
 		}
 		s, _ := openStore()
-		report, err = prReport(ctx, g, cfg, n, s)
+		report, err = prReportEnhanced(ctx, g, cfg, n, s)
 	case "doctor":
 		return cmdDoctor(ctx, g, cfg, svc, openStore, stdout)
 	case "serve":
