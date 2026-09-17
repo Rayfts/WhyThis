@@ -1,0 +1,32 @@
+name: WhyThis PR archaeology
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+jobs:
+  archaeology:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: true
+      - run: go mod download
+      - name: Build evidence report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: go run ./cmd/whythis --json --no-ai pr "${{ inputs.pr }}" > whythis-pr.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whythis-pr-${{ inputs.pr }}
+          path: whythis-pr.json

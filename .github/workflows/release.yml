@@ -1,0 +1,50 @@
+name: Release builds
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  artifacts:
+    strategy:
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+      - run: go mod download
+      - name: Build
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          ext=""; [ "$GOOS" = windows ] && ext=.exe
+          mkdir -p dist
+          go build -trimpath -ldflags='-s -w' -o "dist/whythis_${GOOS}_${GOARCH}${ext}" ./cmd/whythis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whythis-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+  release:
+    needs: artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
