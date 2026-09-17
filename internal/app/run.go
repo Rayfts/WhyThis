@@ -70,6 +70,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	svc := NewService(g)
+	svc.ConfigureGitHub(cfg.GitHubToken, cfg.GitHubAPI, nil)
 	var st *storage.Store
 	openStore := func() (*storage.Store, error) {
 		if st != nil {
@@ -103,7 +104,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if len(tail) < 1 {
 			return argErr(stderr, "symbol requires a symbol name")
 		}
-		report, err = svc.History.Symbol(ctx, tail[0])
+		report, err = svc.Symbol(ctx, tail[0])
 	case "blame":
 		if len(tail) < 1 {
 			return argErr(stderr, "blame requires a path[:line-range]")
@@ -128,7 +129,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if len(tail) < 1 {
 			return argErr(stderr, "commit requires a sha")
 		}
-		report, err = svc.History.Commit(ctx, tail[0])
+		report, err = svc.Commit(ctx, tail[0])
 	case "similar":
 		if len(tail) < 1 {
 			return argErr(stderr, "similar requires a commit sha")
@@ -147,7 +148,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return argErr(stderr, "ask requires a question")
 		}
 		q := strings.Join(tail, " ")
-		report, err = svc.History.SearchQuestion(ctx, q)
+		report, err = svc.Ask(ctx, q)
 	case "index":
 		s, e := openStore()
 		if e != nil {
@@ -169,7 +170,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return argErr(stderr, "invalid PR number")
 		}
 		s, _ := openStore()
-		report, err = prReportEnhanced(ctx, g, cfg, n, s)
+		svc.ConfigureGitHub(cfg.GitHubToken, cfg.GitHubAPI, s)
+		report, err = svc.PR(ctx, n)
 	case "doctor":
 		return cmdDoctor(ctx, g, cfg, svc, openStore, stdout)
 	case "serve":
@@ -178,6 +180,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			addr = tail[0]
 		}
 		log := slog.New(slog.NewTextHandler(stderr, nil))
+		if s, e := openStore(); e == nil {
+			svc.ConfigureGitHub(cfg.GitHubToken, cfg.GitHubAPI, s)
+		}
 		err = (&server.Server{Addr: addr, Service: svc, Logger: log}).ListenAndServe(ctx)
 		if err == nil {
 			return 0

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Rayfts/WhyThis/internal/config"
 	"github.com/Rayfts/WhyThis/internal/githubx"
 	"github.com/Rayfts/WhyThis/internal/gitx"
 	"github.com/Rayfts/WhyThis/internal/graph"
@@ -21,13 +20,13 @@ const maxPRHistoryFiles = 20
 
 var prIssueReference = regexp.MustCompile(`(?i)(?:#|GH-)([0-9]+)`) // repository-local references
 
-func prReportEnhanced(ctx context.Context, g *gitx.Runner, cfg config.Config, number int, cache githubx.Cache) (evidence.Report, error) {
+func prReportEnhanced(ctx context.Context, g *gitx.Runner, token, api string, number int, cache githubx.Cache) (evidence.Report, error) {
 	remote := g.RemoteURL(ctx)
 	repo, err := githubx.ParseRemote(remote)
 	if err != nil {
 		return evidence.Report{}, fmt.Errorf("GitHub remote: %w", err)
 	}
-	client := githubx.New(cfg.GitHubToken, cfg.GitHubAPI, cache)
+	client := githubx.New(token, api, cache)
 	pr, err := client.PR(ctx, repo, number)
 	if err != nil {
 		return evidence.Report{}, err
