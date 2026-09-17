@@ -23,11 +23,13 @@ jobs:
           git diff --exit-code -- go.mod go.sum
       - name: Format
         run: test -z "$(gofmt -l ./cmd ./internal ./pkg)"
+      - name: Go source files stay reviewable
+        run: ./scripts/check-go-file-size.sh
       - run: go vet ./...
       - run: go test -coverprofile=coverage.out ./...
       - run: go test -race ./...
       - name: Bench smoke
-        run: go test -run '^$' -bench . -benchtime=1x ./internal/gitx ./internal/history ./internal/risk ./internal/storage
+        run: go test -run '^$' -bench . -benchtime=1x ./internal/gitx ./internal/history ./internal/index ./internal/risk ./internal/storage
       - name: Vulnerabilities
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

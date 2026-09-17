@@ -26,3 +26,8 @@ For subprocess-based synthesis WhyThis creates a temporary working directory and
 `whythis harnesses` performs executable/extension detection. `whythis capabilities <id>` returns machine-readable details including integration mode, structured-output support and the upstream evidence sources used by the adapter.
 
 Availability means the integration surface was detected locally; it does not mean provider credentials are configured.
+
+
+## External adapters
+
+The built-ins are not a closed list. `pkg/harness` exposes the public `Adapter`, `Capabilities`, `AnalysisRequest` and `AnalysisResult` types so external Go modules can integrate additional harnesses without importing internal packages. See [`adapter-development.md`](adapter-development.md).

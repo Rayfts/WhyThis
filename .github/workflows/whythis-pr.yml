@@ -1,18 +1,34 @@
 name: WhyThis PR archaeology
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr:
         description: Pull request number
         required: true
         type: string
+      comment:
+        description: Post/update a historical-risk comment when the deterministic threshold is crossed
+        required: false
+        default: false
+        type: boolean
+      risk_threshold:
+        description: Deterministic 0-100 historical-risk threshold for commenting
+        required: false
+        default: '50'
+        type: string
 permissions:
   contents: read
   pull-requests: read
-  issues: read
+  issues: write
 jobs:
   archaeology:
     runs-on: ubuntu-latest
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+      COMMENT_ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.comment) || (github.event_name == 'pull_request' && vars.WHYTHIS_AUTO_COMMENT == 'true') }}
+      RISK_THRESHOLD: ${{ inputs.risk_threshold || vars.WHYTHIS_RISK_THRESHOLD || '50' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,8 +41,64 @@ jobs:
       - name: Build evidence report
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: go run ./cmd/whythis --json --no-ai pr "${{ inputs.pr }}" > whythis-pr.json
+        run: go run ./cmd/whythis --json --no-ai pr "$PR_NUMBER" > whythis-pr.json
+      - name: Evaluate deterministic file risk
+        if: ${{ env.COMMENT_ENABLED == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .whyth/pr-risk
+          gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > .whyth/pr-risk/files.txt
+          : > .whyth/pr-risk/objects.jsonl
+          while IFS= read -r path; do
+            [ -f "$path" ] || continue
+            go run ./cmd/whythis --json --no-ai risk "$path" >> .whyth/pr-risk/objects.jsonl
+          done < .whyth/pr-risk/files.txt
+          if [ -s .whyth/pr-risk/objects.jsonl ]; then
+            jq -s 'sort_by(.score) | reverse' .whyth/pr-risk/objects.jsonl > whythis-risk.json
+          else
+            printf '[]\n' > whythis-risk.json
+          fi
+      - name: Post low-noise historical context comment
+        if: ${{ env.COMMENT_ENABLED == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          highest="$(jq -r 'if length == 0 then 0 else .[0].score end' whythis-risk.json)"
+          if [ "$highest" -lt "$RISK_THRESHOLD" ]; then
+            echo "Highest historical-risk score $highest is below threshold $RISK_THRESHOLD; no comment posted."
+            exit 0
+          fi
+          marker='<!-- whythis-historical-context -->'
+          rows="$(jq -r '.[0:10][] | "| `\(.path)` | \(.score)/100 | \(.confidence) | \(.fix_like_commits) | \(.reverts) | \(.churn_lines) | \(.sensitive) |"' whythis-risk.json)"
+          body="$(cat <<BODY
+          $marker
+          ## WhyThis historical context
+
+          WhyThis found changed paths whose **deterministic historical-risk score** crosses the configured threshold of **$RISK_THRESHOLD/100**. This score is not an LLM judgment or failure probability; it is computed from repository-history signals. Sensitive-code classification is shown separately and does not add score by itself.
+
+          | Path | Score | Evidence confidence | Fix-like commits | Reverts | Churn | Sensitive |
+          |---|---:|---|---:|---:|---:|---|
+          $rows
+
+          Full evidence is available in the `whythis-pr` workflow artifact. FACT / INFERENCE / UNKNOWN separation is preserved there.
+          BODY
+          )"
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq ".[] | select(.body | contains(\"$marker\")) | .id" | head -n1)"
+          payload="$(jq -n --arg body "$body" '{body:$body}')"
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" --input - <<<"$payload"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --input - <<<"$payload"
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: whythis-pr-${{ inputs.pr }}
-          path: whythis-pr.json
+          name: whythis-pr-${{ env.PR_NUMBER }}
+          path: |
+            whythis-pr.json
+            whythis-risk.json
+          if-no-files-found: ignore
