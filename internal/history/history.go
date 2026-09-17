@@ -19,6 +19,23 @@ type Archaeologist struct {
 	Git *gitx.Runner
 }
 
+type commitBundle struct {
+	Commit  evidence.Node
+	Related []evidence.Node
+	Claims  []evidence.Claim
+	Edges   []evidence.Edge
+}
+
+func addCommitBundle(b *graph.Builder, bundle commitBundle) {
+	b.AddNode(bundle.Commit)
+	for _, n := range bundle.Related {
+		b.AddNode(n)
+	}
+	for _, e := range bundle.Edges {
+		b.AddEdge(e)
+	}
+}
+
 type Target struct {
 	Path  string
 	Start int
@@ -84,16 +101,34 @@ func (a *Archaeologist) Line(ctx context.Context, target Target) (evidence.Repor
 		b.AddEdge(edge(rangeID, blameID, evidence.EdgeIntroducedBy, head, now, "blame attribution"))
 		if !seen[sha] {
 			seen[sha] = true
-			n, claims, edges, err := a.commitEvidence(ctx, sha, now)
+			bundle, err := a.commitEvidence(ctx, sha, now)
 			if err == nil {
-				b.AddNode(n)
-				timeline = append(timeline, n)
-				facts = append(facts, claims...)
-				for _, e := range edges {
-					b.AddEdge(e)
-				}
-				b.AddEdge(edge(blameID, n.ID, evidence.EdgeIntroducedBy, sha, now, "blame points to commit"))
+				addCommitBundle(b, bundle)
+				timeline = append(timeline, bundle.Commit)
+				facts = append(facts, bundle.Claims...)
+				b.AddEdge(edge(blameID, bundle.Commit.ID, evidence.EdgeIntroducedBy, sha, now, "blame points to commit"))
 			}
+		}
+	}
+
+	// git log -L adds line-range evolution that blame alone cannot show. It is
+	// path-local, so the broader --follow history below still contributes rename
+	// and surrounding file context.
+	if lineSHAs, lineErr := a.Git.LineLogSHAs(ctx, target.Path, target.Start, target.End); lineErr == nil {
+		for _, sha := range lineSHAs {
+			if seen[sha] {
+				continue
+			}
+			seen[sha] = true
+			bundle, bundleErr := a.commitEvidence(ctx, sha, now)
+			if bundleErr != nil {
+				continue
+			}
+			addCommitBundle(b, bundle)
+			timeline = append(timeline, bundle.Commit)
+			facts = append(facts, bundle.Claims...)
+			facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Git line-range history identifies commit %s in the evolution of %s:%d-%d.", short(sha), target.Path, target.Start, target.End), EvidenceID: []string{rangeID, bundle.Commit.ID}})
+			b.AddEdge(edge(rangeID, bundle.Commit.ID, evidence.EdgeChangedBy, sha, now, "git log -L line-range history"))
 		}
 	}
 
@@ -104,17 +139,14 @@ func (a *Archaeologist) Line(ctx context.Context, target Target) (evidence.Repor
 			continue
 		}
 		seen[sha] = true
-		n, claims, edges, err := a.commitEvidence(ctx, sha, now)
+		bundle, err := a.commitEvidence(ctx, sha, now)
 		if err != nil {
 			continue
 		}
-		b.AddNode(n)
-		timeline = append(timeline, n)
-		facts = append(facts, claims...)
-		for _, e := range edges {
-			b.AddEdge(e)
-		}
-		b.AddEdge(edge(fileID, n.ID, evidence.EdgeChangedBy, sha, now, "file history"))
+		addCommitBundle(b, bundle)
+		timeline = append(timeline, bundle.Commit)
+		facts = append(facts, bundle.Claims...)
+		b.AddEdge(edge(fileID, bundle.Commit.ID, evidence.EdgeChangedBy, sha, now, "file history"))
 	}
 	sort.Slice(timeline, func(i, j int) bool {
 		iDate, _ := time.Parse(time.RFC3339, fmt.Sprint(timeline[i].Attributes["date"]))
@@ -143,17 +175,14 @@ func (a *Archaeologist) Symbol(ctx context.Context, symbol string) (evidence.Rep
 	var timeline []evidence.Node
 	var facts []evidence.Claim
 	for _, sha := range nonEmptyLines(raw) {
-		n, claims, edges, e := a.commitEvidence(ctx, sha, now)
+		bundle, e := a.commitEvidence(ctx, sha, now)
 		if e != nil {
 			continue
 		}
-		b.AddNode(n)
-		timeline = append(timeline, n)
-		facts = append(facts, claims...)
-		for _, ed := range edges {
-			b.AddEdge(ed)
-		}
-		b.AddEdge(edge(symID, n.ID, evidence.EdgeChangedBy, sha, now, "pickaxe matched symbol text"))
+		addCommitBundle(b, bundle)
+		timeline = append(timeline, bundle.Commit)
+		facts = append(facts, bundle.Claims...)
+		b.AddEdge(edge(symID, bundle.Commit.ID, evidence.EdgeChangedBy, sha, now, "pickaxe matched symbol text"))
 	}
 	if len(timeline) == 0 {
 		return evidence.Report{Target: symbol, Generated: now, Repository: a.Git.Dir, Revision: head, Graph: b.Build(), Unknowns: []evidence.Claim{{Class: evidence.Unknown, Text: "No Git pickaxe match was found for this symbol text; it may have been generated, renamed, or represented differently historically."}}}, nil
@@ -168,41 +197,41 @@ func (a *Archaeologist) Commit(ctx context.Context, sha string) (evidence.Report
 	}
 	now := time.Now().UTC()
 	b := graph.New()
-	n, claims, edges, err := a.commitEvidence(ctx, sha, now)
+	bundle, err := a.commitEvidence(ctx, sha, now)
 	if err != nil {
 		return evidence.Report{}, err
 	}
-	b.AddNode(n)
-	for _, e := range edges {
-		b.AddEdge(e)
-	}
-	return evidence.Report{Target: sha, Generated: now, Repository: a.Git.Dir, Revision: head, Graph: b.Build(), Facts: claims, Timeline: []evidence.Node{n}, Unknowns: []evidence.Claim{{Class: evidence.Unknown, Text: "A commit message can document intent, but unrecorded motivations remain unknown."}}}, nil
+	addCommitBundle(b, bundle)
+	return evidence.Report{Target: sha, Generated: now, Repository: a.Git.Dir, Revision: head, Graph: b.Build(), Facts: bundle.Claims, Timeline: []evidence.Node{bundle.Commit}, Unknowns: []evidence.Claim{{Class: evidence.Unknown, Text: "A commit message can document intent, but unrecorded motivations remain unknown."}}}, nil
 }
 
-func (a *Archaeologist) commitEvidence(ctx context.Context, sha string, now time.Time) (evidence.Node, []evidence.Claim, []evidence.Edge, error) {
+func (a *Archaeologist) commitEvidence(ctx context.Context, sha string, now time.Time) (commitBundle, error) {
 	raw, err := a.Git.Commit(ctx, sha)
 	if err != nil {
-		return evidence.Node{}, nil, nil, err
+		return commitBundle{}, err
 	}
 	c := gitx.ParseCommitShow(raw)
 	if c.SHA == "" {
-		return evidence.Node{}, nil, nil, fmt.Errorf("could not parse commit %s", sha)
+		return commitBundle{}, fmt.Errorf("could not parse commit %s", sha)
 	}
 	id := "commit:" + c.SHA
 	attrs := map[string]any{"sha": c.SHA, "parents": c.Parents, "author": c.Author, "email": c.Email, "date": c.Date.Format(time.RFC3339), "subject": c.Subject, "body": c.Body, "changes": c.Changes}
 	n := evidence.Node{ID: id, Kind: evidence.KindCommit, Label: c.Subject, Attributes: attrs, Provenance: prov("git-show", "git show "+c.SHA, c.SHA, now)}
 	claims := []evidence.Claim{{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s (%s) changed the relevant history: %s", short(c.SHA), c.Date.Format("2006-01-02"), c.Subject), EvidenceID: []string{id}}}
 	var edges []evidence.Edge
+	var related []evidence.Node
 	for _, m := range issueRef.FindAllStringSubmatch(c.Subject+"\n"+c.Body, -1) {
 		if len(m) < 2 {
 			continue
 		}
 		issueID := "issue:" + m[1]
+		related = append(related, evidence.Node{ID: issueID, Kind: evidence.KindIssue, Label: "#" + m[1], Attributes: map[string]any{"reference_only": true}, Provenance: prov("git-show", "commit message reference", c.SHA, now)})
 		edges = append(edges, edge(id, issueID, evidence.EdgeReferences, c.SHA, now, "commit message reference"))
 		claims = append(claims, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s references issue/PR #%s in its message.", short(c.SHA), m[1]), EvidenceID: []string{id, issueID}})
 	}
 	if m := revertRef.FindStringSubmatch(c.Body); len(m) == 2 {
 		target := "commit:" + m[1]
+		related = append(related, evidence.Node{ID: target, Kind: evidence.KindCommit, Label: "reverted commit " + short(m[1]), Attributes: map[string]any{"sha": m[1], "reference_only": true}, Provenance: prov("git-show", "explicit git revert trailer", c.SHA, now)})
 		edges = append(edges, edge(target, id, evidence.EdgeRevertedBy, c.SHA, now, "explicit git revert trailer"))
 		claims = append(claims, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s explicitly states that it reverts %s.", short(c.SHA), short(m[1])), EvidenceID: []string{id, target}})
 	} else if strings.HasPrefix(strings.ToLower(c.Subject), "revert ") {
@@ -212,16 +241,34 @@ func (a *Archaeologist) commitEvidence(ctx context.Context, sha string, now time
 		if strings.HasPrefix(fc.Status, "R") && fc.Old != "" {
 			oldID := "file:" + fc.Old
 			newID := "file:" + fc.Path
+			related = append(related,
+				evidence.Node{ID: oldID, Kind: evidence.KindFile, Label: fc.Old, Attributes: map[string]any{"historical_path": true}, Provenance: prov("git-show", "rename source", c.SHA, now)},
+				evidence.Node{ID: newID, Kind: evidence.KindFile, Label: fc.Path, Provenance: prov("git-show", "rename destination", c.SHA, now)},
+			)
 			edges = append(edges, edge(newID, oldID, evidence.EdgeRenamedFrom, c.SHA, now, "git rename detection"))
 			claims = append(claims, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Git rename detection records %s → %s in %s.", fc.Old, fc.Path, short(c.SHA)), EvidenceID: []string{id}})
 		}
 		if isTestPath(fc.Path) {
 			testID := "test:" + fc.Path
+			related = append(related, evidence.Node{ID: testID, Kind: evidence.KindTest, Label: fc.Path, Provenance: prov("git-show", "test-like file changed in same commit", c.SHA, now)})
 			edges = append(edges, edge(id, testID, evidence.EdgeTestedBy, c.SHA, now, "test file changed in same commit"))
 			claims = append(claims, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("The same commit changed test-like file %s.", fc.Path), EvidenceID: []string{id, testID}})
 		}
 	}
-	return n, claims, edges, nil
+	return commitBundle{Commit: n, Related: dedupeNodes(related), Claims: claims, Edges: edges}, nil
+}
+
+func dedupeNodes(in []evidence.Node) []evidence.Node {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]evidence.Node, 0, len(in))
+	for _, n := range in {
+		if _, ok := seen[n.ID]; ok {
+			continue
+		}
+		seen[n.ID] = struct{}{}
+		out = append(out, n)
+	}
+	return out
 }
 
 func (a *Archaeologist) fileHistorySHAs(ctx context.Context, path string) ([]string, error) {
@@ -286,21 +333,18 @@ func (a *Archaeologist) File(ctx context.Context, path string) (evidence.Report,
 	var timeline []evidence.Node
 	var prev string
 	for _, sha := range shas {
-		n, claims, edges, e := a.commitEvidence(ctx, sha, now)
+		bundle, e := a.commitEvidence(ctx, sha, now)
 		if e != nil {
 			continue
 		}
-		b.AddNode(n)
-		timeline = append(timeline, n)
-		facts = append(facts, claims...)
-		for _, ed := range edges {
-			b.AddEdge(ed)
-		}
-		b.AddEdge(edge(fileID, n.ID, evidence.EdgeChangedBy, sha, now, "git log --follow"))
+		addCommitBundle(b, bundle)
+		timeline = append(timeline, bundle.Commit)
+		facts = append(facts, bundle.Claims...)
+		b.AddEdge(edge(fileID, bundle.Commit.ID, evidence.EdgeChangedBy, sha, now, "git log --follow"))
 		if prev != "" {
-			b.AddEdge(edge(n.ID, prev, evidence.EdgeFollowedBy, sha, now, "chronological file history"))
+			b.AddEdge(edge(bundle.Commit.ID, prev, evidence.EdgeFollowedBy, sha, now, "chronological file history"))
 		}
-		prev = n.ID
+		prev = bundle.Commit.ID
 	}
 	// git log is newest-first; expose chronological timeline.
 	sort.Slice(timeline, func(i, j int) bool {
@@ -338,17 +382,14 @@ func (a *Archaeologist) SearchQuestion(ctx context.Context, q string) (evidence.
 					continue
 				}
 				seen[sha] = true
-				n, claims, edges, e := a.commitEvidence(ctx, sha, now)
+				bundle, e := a.commitEvidence(ctx, sha, now)
 				if e != nil {
 					continue
 				}
-				b.AddNode(n)
-				timeline = append(timeline, n)
-				facts = append(facts, claims...)
-				for _, ed := range edges {
-					b.AddEdge(ed)
-				}
-				b.AddEdge(edge(rootID, n.ID, evidence.EdgeAssociatedWith, sha, now, "query term matched commit message or patch: "+term))
+				addCommitBundle(b, bundle)
+				timeline = append(timeline, bundle.Commit)
+				facts = append(facts, bundle.Claims...)
+				b.AddEdge(edge(rootID, bundle.Commit.ID, evidence.EdgeAssociatedWith, sha, now, "query term matched commit message or patch: "+term))
 			}
 		}
 	}

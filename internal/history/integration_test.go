@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Rayfts/WhyThis/internal/gitx"
+	"github.com/Rayfts/WhyThis/internal/graph"
 )
 
 func TestSyntheticArchaeologyHistory(t *testing.T) {
@@ -39,6 +40,9 @@ func TestSyntheticArchaeologyHistory(t *testing.T) {
 	if len(rep.Timeline) < 3 {
 		t.Fatalf("expected history across rename, got %d commits", len(rep.Timeline))
 	}
+	if err := graph.Validate(rep.Graph); err != nil {
+		t.Fatalf("file report graph is not closed: %v", err)
+	}
 	joined := ""
 	for _, f := range rep.Facts {
 		joined += f.Text + "\n"
@@ -52,6 +56,9 @@ func TestSyntheticArchaeologyHistory(t *testing.T) {
 	}
 	if len(line.Facts) == 0 || len(line.Graph.Nodes) == 0 {
 		t.Fatal("expected blame-backed evidence")
+	}
+	if err := graph.Validate(line.Graph); err != nil {
+		t.Fatalf("line report graph is not closed: %v", err)
 	}
 }
 
@@ -134,6 +141,9 @@ func TestSimilarFindsStablePatchReapplication(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected reapplied commit %s to be detected as stable patch-id match", reapplied)
+	}
+	if err := graph.Validate(rep.Graph); err != nil {
+		t.Fatalf("similar report graph is not closed: %v", err)
 	}
 }
 

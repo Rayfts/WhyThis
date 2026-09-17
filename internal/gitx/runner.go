@@ -67,7 +67,7 @@ func (r *Runner) Output(ctx context.Context, args ...string) (string, error) {
 }
 
 func (r *Runner) Head(ctx context.Context) (string, error) {
-	out, err := r.Output(context.Background(), "rev-parse", "HEAD")
+	out, err := r.Output(ctx, "rev-parse", "HEAD")
 	return strings.TrimSpace(out), err
 }
 
@@ -102,6 +102,41 @@ func (r *Runner) Blame(ctx context.Context, path string, start, end int) (string
 
 func (r *Runner) FileLog(ctx context.Context, path string) (string, error) {
 	return r.Output(ctx, "log", "--follow", "--date=iso-strict", "--format=%H%x1f%aN%x1f%aE%x1f%aI%x1f%s%x1f%b%x1e", "--name-status", "--find-renames", "--", filepath.ToSlash(path))
+}
+
+// LineLogSHAs asks Git to trace the evolution of a concrete line range. Git's
+// -L machinery follows the selected hunk through edits within the current
+// path. It does not follow file renames, so callers should combine it with
+// blame/file-history evidence when rename lineage matters.
+func (r *Runner) LineLogSHAs(ctx context.Context, path string, start, end int) ([]string, error) {
+	if start <= 0 {
+		start = 1
+	}
+	if end < start {
+		end = start
+	}
+	spec := strconv.Itoa(start) + "," + strconv.Itoa(end) + ":" + filepath.ToSlash(path)
+	out, err := r.Output(ctx, "log", "--no-color", "--format=WHYT:%H", "-L", spec)
+	if err != nil {
+		return nil, err
+	}
+	var shas []string
+	seen := map[string]struct{}{}
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.HasPrefix(line, "WHYT:") {
+			continue
+		}
+		sha := strings.TrimSpace(strings.TrimPrefix(line, "WHYT:"))
+		if sha == "" {
+			continue
+		}
+		if _, ok := seen[sha]; ok {
+			continue
+		}
+		seen[sha] = struct{}{}
+		shas = append(shas, sha)
+	}
+	return shas, nil
 }
 
 func (r *Runner) Commit(ctx context.Context, sha string) (string, error) {

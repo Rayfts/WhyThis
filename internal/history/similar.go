@@ -17,8 +17,7 @@ type similarHit struct {
 	sha, patchID        string
 	exact               bool
 	score, paths, lines float64
-	node                evidence.Node
-	edges               []evidence.Edge
+	bundle              commitBundle
 }
 
 // Similar ranks related historical patches using stable patch-id equality and
@@ -35,10 +34,12 @@ func (a *Archaeologist) Similar(ctx context.Context, sha string, limit int) (evi
 		return evidence.Report{}, err
 	}
 	now := time.Now().UTC()
-	target, facts, targetEdges, err := a.commitEvidence(ctx, sha, now)
+	targetBundle, err := a.commitEvidence(ctx, sha, now)
 	if err != nil {
 		return evidence.Report{}, err
 	}
+	target := targetBundle.Commit
+	facts := append([]evidence.Claim(nil), targetBundle.Claims...)
 	targetSHA := fmt.Sprint(target.Attributes["sha"])
 	patch, err := a.Git.Patch(ctx, targetSHA)
 	if err != nil {
@@ -76,11 +77,11 @@ func (a *Archaeologist) Similar(ctx context.Context, sha string, limit int) (evi
 		if !exact && score < .20 {
 			continue
 		}
-		n, _, edges, e := a.commitEvidence(ctx, candidate, now)
+		bundle, e := a.commitEvidence(ctx, candidate, now)
 		if e != nil {
 			continue
 		}
-		hits = append(hits, similarHit{candidate, cpid, exact, score, pathScore, lineScore, n, edges})
+		hits = append(hits, similarHit{sha: candidate, patchID: cpid, exact: exact, score: score, paths: pathScore, lines: lineScore, bundle: bundle})
 	}
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].exact != hits[j].exact {
@@ -95,28 +96,22 @@ func (a *Archaeologist) Similar(ctx context.Context, sha string, limit int) (evi
 		hits = hits[:limit]
 	}
 	b := graph.New()
-	b.AddNode(target)
-	for _, e := range targetEdges {
-		b.AddEdge(e)
-	}
+	addCommitBundle(b, targetBundle)
 	timeline := []evidence.Node{target}
 	for _, h := range hits {
-		if h.node.Attributes == nil {
-			h.node.Attributes = map[string]any{}
+		if h.bundle.Commit.Attributes == nil {
+			h.bundle.Commit.Attributes = map[string]any{}
 		}
-		h.node.Attributes["similarity_score"], h.node.Attributes["path_overlap"] = h.score, h.paths
-		h.node.Attributes["changed_line_overlap"], h.node.Attributes["patch_id"] = h.lines, h.patchID
-		h.node.Attributes["exact_patch_id_match"] = h.exact
-		b.AddNode(h.node)
-		for _, e := range h.edges {
-			b.AddEdge(e)
-		}
-		b.AddEdge(evidence.Edge{From: target.ID, To: h.node.ID, Kind: evidence.EdgeAssociatedWith, Attributes: map[string]any{"reason": "deterministic patch similarity", "score": h.score, "exact_patch_id_match": h.exact}, Provenance: prov("git-patch-similarity", "git patch-id --stable + normalized diff overlap", head, now)})
-		timeline = append(timeline, h.node)
+		h.bundle.Commit.Attributes["similarity_score"], h.bundle.Commit.Attributes["path_overlap"] = h.score, h.paths
+		h.bundle.Commit.Attributes["changed_line_overlap"], h.bundle.Commit.Attributes["patch_id"] = h.lines, h.patchID
+		h.bundle.Commit.Attributes["exact_patch_id_match"] = h.exact
+		addCommitBundle(b, h.bundle)
+		b.AddEdge(evidence.Edge{From: target.ID, To: h.bundle.Commit.ID, Kind: evidence.EdgeAssociatedWith, Attributes: map[string]any{"reason": "deterministic patch similarity", "score": h.score, "exact_patch_id_match": h.exact}, Provenance: prov("git-patch-similarity", "git patch-id --stable + normalized diff overlap", head, now)})
+		timeline = append(timeline, h.bundle.Commit)
 		if h.exact {
-			facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s has the same stable Git patch-id as %s.", short(h.sha), short(targetSHA)), EvidenceID: []string{target.ID, h.node.ID}})
+			facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s has the same stable Git patch-id as %s.", short(h.sha), short(targetSHA)), EvidenceID: []string{target.ID, h.bundle.Commit.ID}})
 		} else {
-			facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s has deterministic structural patch overlap %.0f%% with %s (path %.0f%%, changed-line %.0f%%).", short(h.sha), h.score*100, short(targetSHA), h.paths*100, h.lines*100), EvidenceID: []string{target.ID, h.node.ID}})
+			facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: fmt.Sprintf("Commit %s has deterministic structural patch overlap %.0f%% with %s (path %.0f%%, changed-line %.0f%%).", short(h.sha), h.score*100, short(targetSHA), h.paths*100, h.lines*100), EvidenceID: []string{target.ID, h.bundle.Commit.ID}})
 		}
 	}
 	unknown := []evidence.Claim{{Class: evidence.Unknown, Text: "Patch similarity does not establish shared intent or causality; matching rationale requires explicit history or discussion evidence."}}
