@@ -35,6 +35,7 @@ whythis symbol SessionManager.Refresh
 whythis history src/auth/session.go
 whythis risk src/auth/session.go
 whythis commit <sha>
+whythis similar <sha> 10
 whythis pr 123
 whythis ask "What broke before this retry code was added?"
 whythis index
@@ -58,7 +59,7 @@ The synthesis is emitted under **INFERENCES**. Git/GitHub-derived **FACTS** stay
 
 ## What the deterministic core does
 
-For a line/range, WhyThis uses native Git blame and history machinery to identify introducing/current attribution, subsequent file edits, explicit revert trailers, rename detection, issue/PR references in commit messages, and test-like files changed alongside relevant commits. File history uses `git log --follow`; symbol archaeology uses pickaxe history; PR lookup can add reviews/comments through the GitHub REST API. The resulting nodes and edges retain provenance fields describing the collector, locator and revision.
+For a line/range, WhyThis uses native Git blame and history machinery to identify introducing/current attribution, subsequent file edits, explicit revert trailers, rename detection, issue/PR references in commit messages, and test-like files changed alongside relevant commits. File history uses `git log --follow`; symbol archaeology uses pickaxe history; PR lookup can add reviews/comments through the GitHub REST API. `whythis similar <sha>` searches recent history using stable Git patch IDs plus deterministic changed-path/changed-line overlap; the measured overlap is evidence, while any claim that two patches share intent remains inference. The resulting nodes and edges retain provenance fields describing the collector, locator and revision.
 
 The index is incremental. It records the indexed head, verifies ancestry with `git merge-base --is-ancestor`, indexes only new commits on a normal fast-forward history, and rebuilds when the previous indexed head is no longer an ancestor (for example after a rebase).
 

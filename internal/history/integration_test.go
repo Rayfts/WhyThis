@@ -98,3 +98,63 @@ func write(t *testing.T, dir, name, body string) {
 		t.Fatal(err)
 	}
 }
+
+func TestSimilarFindsStablePatchReapplication(t *testing.T) {
+	dir := t.TempDir()
+	git(t, dir, "init", "-q")
+	git(t, dir, "config", "user.name", "WhyThis Fixture")
+	git(t, dir, "config", "user.email", "fixture@example.com")
+	write(t, dir, "retry.go", "package fixture\n\nfunc retry() int { return 1 }\n")
+	git(t, dir, "add", "retry.go")
+	git(t, dir, "commit", "-q", "-m", "feat: initial retry")
+	write(t, dir, "retry.go", "package fixture\n\nfunc retry() int { return 2 }\n")
+	git(t, dir, "add", "retry.go")
+	git(t, dir, "commit", "-q", "-m", "fix: bound retry")
+	original := gitOutput(t, dir, "rev-parse", "HEAD")
+	git(t, dir, "revert", "--no-edit", "HEAD")
+	write(t, dir, "retry.go", "package fixture\n\nfunc retry() int { return 2 }\n")
+	git(t, dir, "add", "retry.go")
+	git(t, dir, "commit", "-q", "-m", "feat: reapply bounded retry")
+	reapplied := gitOutput(t, dir, "rev-parse", "HEAD")
+
+	g, err := gitx.New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep, err := (&Archaeologist{Git: g}).Similar(context.Background(), original, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, n := range rep.Graph.Nodes {
+		if n.ID == "commit:"+reapplied && n.Attributes["exact_patch_id_match"] == true {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected reapplied commit %s to be detected as stable patch-id match", reapplied)
+	}
+}
+
+func TestPatchSignatureSimilarity(t *testing.T) {
+	a := patchSig("diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n-old()\n+new()\n")
+	b := patchSig("diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n-old()\n+newer()\n")
+	if got := overlap(a.paths, b.paths); got != 1 {
+		t.Fatalf("path similarity = %v, want 1", got)
+	}
+	if got := overlap(a.lines, b.lines); got <= 0 || got >= 1 {
+		t.Fatalf("line similarity = %v, want partial overlap", got)
+	}
+}
+
+func gitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	c := exec.Command("git", args...)
+	c.Dir = dir
+	out, err := c.Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return strings.TrimSpace(string(out))
+}

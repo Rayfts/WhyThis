@@ -131,6 +131,19 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return argErr(stderr, "commit requires a sha")
 		}
 		report, err = svc.History.Commit(ctx, tail[0])
+	case "similar":
+		if len(tail) < 1 {
+			return argErr(stderr, "similar requires a commit sha")
+		}
+		limit := 10
+		if len(tail) > 1 {
+			n, e := strconv.Atoi(tail[1])
+			if e != nil || n <= 0 {
+				return argErr(stderr, "similar limit must be a positive integer")
+			}
+			limit = n
+		}
+		report, err = svc.Similar(ctx, tail[0], limit)
 	case "ask":
 		if len(tail) < 1 {
 			return argErr(stderr, "ask requires a question")
@@ -412,6 +425,7 @@ Usage:
   whythis history path/to/file.go
   whythis risk path/to/file.go
   whythis commit <sha>
+  whythis similar <sha> [limit]
   whythis pr <number>
   whythis ask "Why is this retry loop here?"
   whythis index

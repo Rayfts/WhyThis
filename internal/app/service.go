@@ -30,6 +30,9 @@ func (s *Service) Line(ctx context.Context, target string) (evidence.Report, err
 func (s *Service) FileHistory(ctx context.Context, path string) (evidence.Report, error) {
 	return s.History.File(ctx, path)
 }
+func (s *Service) Similar(ctx context.Context, sha string, limit int) (evidence.Report, error) {
+	return s.History.Similar(ctx, sha, limit)
+}
 func (s *Service) Risk(ctx context.Context, path string) (risk.Report, error) {
 	if path == "" {
 		return risk.Report{}, fmt.Errorf("path required")
