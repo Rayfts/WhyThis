@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+.whyth/whythis.db
+.whyth/cache/
+apps/desktop/src-tauri/target/
