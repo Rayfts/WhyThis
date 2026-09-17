@@ -10,11 +10,9 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Rayfts/WhyThis/internal/analysis"
 	"github.com/Rayfts/WhyThis/internal/config"
-	"github.com/Rayfts/WhyThis/internal/githubx"
 	"github.com/Rayfts/WhyThis/internal/gitx"
 	"github.com/Rayfts/WhyThis/internal/harness"
 	"github.com/Rayfts/WhyThis/internal/history"
@@ -390,28 +388,6 @@ func mapBool(v bool, a, b string) string {
 		return a
 	}
 	return b
-}
-
-func prReport(ctx context.Context, g *gitx.Runner, cfg config.Config, n int, cache githubx.Cache) (evidence.Report, error) {
-	remote := g.RemoteURL(ctx)
-	repo, err := githubx.ParseRemote(remote)
-	if err != nil {
-		return evidence.Report{}, fmt.Errorf("GitHub remote: %w", err)
-	}
-	client := githubx.New(cfg.GitHubToken, cfg.GitHubAPI, cache)
-	pr, err := client.PR(ctx, repo, n)
-	if err != nil {
-		return evidence.Report{}, err
-	}
-	head, _ := g.Head(ctx)
-	now := time.Now().UTC()
-	id := fmt.Sprintf("pr:%d", n)
-	node := evidence.Node{ID: id, Kind: evidence.KindPullRequest, Label: pr.PullRequest.Title, Attributes: map[string]any{"number": n, "state": pr.PullRequest.State, "url": pr.PullRequest.HTMLURL, "author": pr.PullRequest.User.Login, "merge_commit_sha": pr.PullRequest.MergeCommitSHA, "body": pr.PullRequest.Body, "reviews": pr.Reviews, "issue_comments": pr.IssueComments, "review_comments": pr.ReviewComments}, Provenance: evidence.Provenance{Source: "github-rest", Locator: pr.PullRequest.HTMLURL, Repository: repo.Owner + "/" + repo.Name, Revision: head, CollectedAt: now}}
-	facts := []evidence.Claim{{Class: evidence.Fact, Text: fmt.Sprintf("GitHub PR #%d is %s: %s", n, pr.PullRequest.State, pr.PullRequest.Title), EvidenceID: []string{id}}}
-	if pr.PullRequest.MergeCommitSHA != "" {
-		facts = append(facts, evidence.Claim{Class: evidence.Fact, Text: "GitHub reports merge commit " + pr.PullRequest.MergeCommitSHA + " for this PR.", EvidenceID: []string{id}})
-	}
-	return evidence.Report{Target: fmt.Sprintf("PR #%d", n), Generated: now, Repository: g.Dir, Revision: head, Graph: evidence.Graph{Nodes: []evidence.Node{node}}, Facts: facts, Unknowns: []evidence.Claim{{Class: evidence.Unknown, Text: "A PR discussion can document rationale, but comments are not assumed to be correct unless corroborated by repository evidence."}}}, nil
 }
 
 func usage(w io.Writer) {
