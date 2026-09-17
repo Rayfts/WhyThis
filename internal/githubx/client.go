@@ -102,21 +102,43 @@ func ParseRemote(raw string) (Repo, error) {
 
 func (c *Client) PR(ctx context.Context, repo Repo, number int) (PRContext, error) {
 	var out PRContext
-	if err := c.get(ctx, fmt.Sprintf("/repos/%s/%s/pulls/%d", repo.Owner, repo.Name, number), &out.PullRequest); err != nil {
+	owner, name := url.PathEscape(repo.Owner), url.PathEscape(repo.Name)
+	if err := c.get(ctx, fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, name, number), &out.PullRequest); err != nil {
 		return out, err
 	}
-	_ = c.get(ctx, fmt.Sprintf("/repos/%s/%s/issues/%d/comments?per_page=100", repo.Owner, repo.Name, number), &out.IssueComments)
-	_ = c.get(ctx, fmt.Sprintf("/repos/%s/%s/pulls/%d/comments?per_page=100", repo.Owner, repo.Name, number), &out.ReviewComments)
-	_ = c.get(ctx, fmt.Sprintf("/repos/%s/%s/pulls/%d/reviews?per_page=100", repo.Owner, repo.Name, number), &out.Reviews)
+	var err error
+	out.IssueComments, err = getAllPages[Comment](ctx, c, func(page int) string {
+		return fmt.Sprintf("/repos/%s/%s/issues/%d/comments?per_page=%d&page=%d", owner, name, number, githubPageSize, page)
+	})
+	if err != nil {
+		return out, fmt.Errorf("PR issue comments: %w", err)
+	}
+	out.ReviewComments, err = getAllPages[Comment](ctx, c, func(page int) string {
+		return fmt.Sprintf("/repos/%s/%s/pulls/%d/comments?per_page=%d&page=%d", owner, name, number, githubPageSize, page)
+	})
+	if err != nil {
+		return out, fmt.Errorf("PR review comments: %w", err)
+	}
+	out.Reviews, err = getAllPages[Review](ctx, c, func(page int) string {
+		return fmt.Sprintf("/repos/%s/%s/pulls/%d/reviews?per_page=%d&page=%d", owner, name, number, githubPageSize, page)
+	})
+	if err != nil {
+		return out, fmt.Errorf("PR reviews: %w", err)
+	}
 	return out, nil
 }
 func (c *Client) Issue(ctx context.Context, repo Repo, number int) (Issue, []Comment, error) {
 	var issue Issue
-	var comments []Comment
-	if err := c.get(ctx, fmt.Sprintf("/repos/%s/%s/issues/%d", repo.Owner, repo.Name, number), &issue); err != nil {
+	owner, name := url.PathEscape(repo.Owner), url.PathEscape(repo.Name)
+	if err := c.get(ctx, fmt.Sprintf("/repos/%s/%s/issues/%d", owner, name, number), &issue); err != nil {
 		return issue, nil, err
 	}
-	_ = c.get(ctx, fmt.Sprintf("/repos/%s/%s/issues/%d/comments?per_page=100", repo.Owner, repo.Name, number), &comments)
+	comments, err := getAllPages[Comment](ctx, c, func(page int) string {
+		return fmt.Sprintf("/repos/%s/%s/issues/%d/comments?per_page=%d&page=%d", owner, name, number, githubPageSize, page)
+	})
+	if err != nil {
+		return issue, nil, fmt.Errorf("issue comments: %w", err)
+	}
 	return issue, comments, nil
 }
 
