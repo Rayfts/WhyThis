@@ -3,6 +3,7 @@ package tui
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -45,7 +46,7 @@ func RunWithOptions(ctx context.Context, svc Service, repoRoot string, in io.Rea
 		_, _ = fmt.Fprint(out, "\nwhythis> ")
 		choice, err := readLine(r)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
