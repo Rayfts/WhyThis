@@ -1,30 +1,42 @@
-# Contributing
+# Contributing to WhyThis
 
-Thanks for helping improve WhyThis.
+Thanks for helping improve WhyThis. Useful contributions include Git-history retrieval, evidence modeling, indexing, GitHub enrichment, TUI/API work, harness adapters, performance improvements, fixtures, and documentation.
 
-## Development
+The project's central rule is simple: **never answer “why” without showing the evidence.**
 
-Use Go 1.27 or newer and Git. Then run:
+## Development setup
+
+WhyThis requires Go 1.27+ and the native `git` executable.
 
 ```bash
-go mod download
 make fmt
 make vet
 make test
 make race
+make bench
 ```
 
-Before opening a pull request, add or update tests for archaeology behavior. Prefer synthetic repositories whose history is intentionally constructed and whose expected evidence can be asserted exactly.
+For focused development, normal Go commands are also fine:
 
-## Evidence integrity rules
+```bash
+go test ./...
+go vet ./...
+go build ./cmd/whythis
+```
 
-- Keep Go source files at or below 300 lines; split by responsibility when they grow beyond that boundary.
-- Do not add a FACT unless a deterministic collector can point to its provenance.
-- Do not parse an LLM response into deterministic evidence.
-- Keep Git process execution inside `internal/gitx`.
-- If a harness integration changes, cite current upstream source/docs in `docs/harnesses.md` and add capability tests.
-- Do not silently ignore shallow history, GitHub rate limits, parse failures or missing credentials.
+## Design rules
 
-## Changes
+1. Git/GitHub-derived observations are **FACTS**; agent interpretation is **INFERENCE**.
+2. Unknown history stays **UNKNOWN**. Do not turn absence of evidence into a confident explanation.
+3. Prefer native Git behavior for blame, rename tracking, ancestry, pickaxe, and line history rather than reimplementing semantics loosely.
+4. Historical-risk scores must remain deterministic, explainable, and independent of LLM output.
+5. New evidence nodes/edges must preserve provenance and a stable locator/revision where possible.
+6. Harness adapters may synthesize evidence but must not become the source of historical facts.
+7. Do not invent third-party flags or capabilities; cite upstream source/docs in adapter changes.
+8. Add fixtures or regression tests for archaeology edge cases such as renames, reverts, deleted files, merges, shallow history, and rebases.
 
-Keep commits focused. Public behavior and new evidence relations should be documented. Security-sensitive changes should follow `SECURITY.md`.
+## Pull requests
+
+Keep PRs focused and explain the evidence path affected. Include tests for behavior changes, benchmark notes for expensive history/indexing changes, and documentation updates when CLI/API output or evidence semantics change.
+
+Security-sensitive changes should follow `SECURITY.md`. By contributing, you agree to follow `CODE_OF_CONDUCT.md` and the Apache-2.0 license terms.

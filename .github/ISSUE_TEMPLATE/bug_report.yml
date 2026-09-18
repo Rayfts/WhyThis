@@ -1,0 +1,49 @@
+name: Bug report
+description: Report incorrect archaeology, indexing, or CLI behavior
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for reporting a bug. Do not include secrets, private repository data, or vulnerability details here."
+  - type: input
+    id: version
+    attributes:
+      label: WhyThis version or commit
+      placeholder: "v0.x.y or commit SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed result and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include the command and, when possible, a small synthetic Git history that demonstrates the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version, Git version, harness (if any), and shallow/full clone status.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Sanitized output
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed credentials and private repository content.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
