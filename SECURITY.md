@@ -1,11 +1,22 @@
-# Security policy
+# Security Policy
 
-Please report security vulnerabilities privately through GitHub's security advisory flow for this repository when available. Do not open a public issue containing exploit details, credentials or sensitive repository history.
+WhyThis reads repository history, optionally queries GitHub, and can pass collected evidence to external coding-agent harnesses. Treat repositories, commit messages, issue text, review text, and harness output as untrusted input.
 
-## Scope
+## Reporting a vulnerability
 
-Security-relevant areas include command construction, path handling, GitHub token handling, HTTP server exposure, SQLite/cache integrity, harness process isolation, prompt/evidence leakage and unsafe parsing of untrusted repository metadata.
+Do not publish exploit details, credentials, private repository contents, or token-exposure bugs in a public issue.
 
-WhyThis does not require a GitHub token for local Git analysis. Tokens are read from environment variables and must never be written into evidence, logs or cache keys. Harness synthesis may transmit the evidence included in a prompt to the configured model/provider; users are responsible for ensuring that repository history is appropriate to send to that provider.
+If GitHub private vulnerability reporting is enabled, use **Security → Report a vulnerability**. Otherwise, open a minimal non-sensitive issue requesting a private reporting channel.
 
-The local HTTP API binds to loopback by default and currently has no authentication. Do not expose it directly to an untrusted network.
+Include the affected commit/version, operating system, minimal reproduction, impact, and whether the issue can expose repository data, GitHub credentials, local files, or execute unintended commands.
+
+## Security boundaries
+
+- Harness output is inference, never historical evidence.
+- Harness synthesis should use temporary working directories and should not require write access to the analyzed repository.
+- GitHub tokens should be narrowly scoped and are used only when enrichment is requested/configured.
+- The local HTTP API binds to loopback by default. Authentication is not currently provided; do not expose it directly to untrusted networks.
+- Do not place secrets in prompts, commit messages, issue bodies, exported evidence, screenshots, or fixtures.
+- Repository text rendered in the TUI/API must be treated as data, not instructions.
+
+A security fix that changes evidence interpretation should include tests proving that provenance and FACT / INFERENCE / UNKNOWN separation are preserved.

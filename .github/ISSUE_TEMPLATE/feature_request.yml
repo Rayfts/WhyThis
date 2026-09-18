@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a new archaeology, evidence, or integration capability
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What maintenance or code-archaeology problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the CLI/API/TUI behavior or evidence source you want.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance model
+      description: If this adds evidence, how can WhyThis show where it came from and distinguish fact from inference?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked for an existing issue describing the same request.
+          required: true
