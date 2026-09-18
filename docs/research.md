@@ -16,4 +16,4 @@ The GitHub search did not reveal an established project with the exact WhyThis c
 2. Historical metrics/risk remain deterministic.
 3. GitHub discussion is evidence only when fetched and preserved with provenance.
 4. AI is a semantic interpreter behind a `--no-ai`-complete deterministic path.
-5. Symbol identity is not overclaimed: current support starts with pickaxe/text history, with language-aware identity tracking left for later work.
+5. Symbol identity is not overclaimed. The initial design used pickaxe/text history as the portable fallback; the current implementation also uses Go AST declarations and `git log -L` for Go symbols, while non-Go and deleted-symbol paths retain the textual fallback.
