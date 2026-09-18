@@ -36,7 +36,7 @@ func ResolveGo(repoRoot, query string) ([]Location, error) {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(strings.ToLower(path), ".go") || strings.HasSuffix(path, "_test.go") && strings.HasPrefix(name, "Test") == false {
+		if !strings.HasSuffix(strings.ToLower(path), ".go") || strings.HasSuffix(path, "_test.go") && !strings.HasPrefix(name, "Test") {
 			return nil
 		}
 		rel, relErr := filepath.Rel(repoRoot, path)
