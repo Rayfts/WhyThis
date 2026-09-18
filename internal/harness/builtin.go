@@ -19,7 +19,7 @@ func builtins() []Harness {
 		commandHarness{id: "opencode", binary: "opencode", integration: "process: opencode run --format json", structured: true, sources: []string{"anomalyco/opencode packages/web/src/content/docs/cli.mdx"}, args: func(_ string, p string) []string { return []string{"run", "--format", "json", p} }},
 		piHarness{},
 		commandHarness{id: "gemini", binary: "gemini", integration: "process: gemini -p + stream-json", structured: true, sources: []string{"google-gemini/gemini-cli docs/reference/configuration.md"}, args: func(_ string, p string) []string { return []string{"-p", p, "--output-format", "stream-json"} }},
-		commandHarness{id: "aider", binary: "aider", integration: "process: --message-file (one-shot)", structured: false, sources: []string{"Aider-AI/aider aider/args.py"}, args: func(f string, _ string) []string { return []string{"--message-file", f, "--yes-always"} }},
+		commandHarness{id: "aider", binary: "aider", integration: "process: --message-file (one-shot)", structured: false, sources: []string{"Aider-AI/aider aider/website/docs/scripting.md"}, args: func(f string, _ string) []string { return []string{"--message-file", f, "--yes"} }},
 		commandHarness{id: "goose", binary: "goose", integration: "process: goose run --text + stream-json", structured: true, sources: []string{"aaif-goose/goose crates/goose-cli/src/cli.rs"}, args: func(_ string, p string) []string {
 			return []string{"run", "--text", p, "--output-format", "stream-json", "--no-session"}
 		}},
@@ -34,7 +34,7 @@ type piHarness struct{}
 func (piHarness) ID() string { return "pi" }
 func (piHarness) Detect(ctx context.Context) (Capabilities, error) {
 	p, err := exec.LookPath("pi")
-	return Capabilities{ID: "pi", Available: err == nil, Executable: p, Integration: "JSONL RPC: pi --mode rpc --no-session", StructuredOutput: true, SessionProtocol: true, EvidenceSources: []string{"earendil-works/pi packages/coding-agent/docs/rpc.md"}}, nil
+	return Capabilities{ID: "pi", Available: err == nil, Executable: p, Integration: "JSONL RPC: pi --mode rpc --no-session", StructuredOutput: true, SessionProtocol: true, EvidenceSources: []string{"mitsuhiko/pi-mono packages/coding-agent/docs/rpc.md"}}, nil
 }
 func (piHarness) Analyze(ctx context.Context, req AnalysisRequest) (AnalysisResult, error) {
 	p, err := exec.LookPath("pi")
