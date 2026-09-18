@@ -34,7 +34,7 @@ type piHarness struct{}
 func (piHarness) ID() string { return "pi" }
 func (piHarness) Detect(ctx context.Context) (Capabilities, error) {
 	p, err := exec.LookPath("pi")
-	return Capabilities{ID: "pi", Available: err == nil, Executable: p, Integration: "JSONL RPC: pi --mode rpc --no-session", StructuredOutput: true, SessionProtocol: true, EvidenceSources: []string{"earendil-works/pi packages/coding-agent/docs/rpc.md"}}, nil
+	return Capabilities{ID: "pi", Available: err == nil, Executable: p, Integration: "JSONL RPC: pi --mode rpc --no-session", StructuredOutput: true, SessionProtocol: true, EvidenceSources: []string{"mitsuhiko/pi-mono packages/coding-agent/docs/rpc.md"}}, nil
 }
 func (piHarness) Analyze(ctx context.Context, req AnalysisRequest) (AnalysisResult, error) {
 	p, err := exec.LookPath("pi")
